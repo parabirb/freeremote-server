@@ -2,9 +2,9 @@ import ngrok from "ngrok";
 import audify from "audify";
 import xmlrpc from "xmlrpc";
 import * as ft8 from "ft8js";
+import sqlite3 from "sqlite3";
 import config from "./config.js";
 import { Server } from "socket.io";
-import { JSONFilePreset } from "lowdb/node";
 import { SlashCommandBuilder } from "@discordjs/builders";
 import {
     readKey,
@@ -21,9 +21,19 @@ import {
     AttachmentBuilder,
     GatewayIntentBits,
 } from "discord.js";
+ 
+// initialize db :3
+const db = new sqlite3.Database("database.sqlite");
 
-// get the db
-const db = await JSONFilePreset("database.json", { users: [] });
+// create tables :3
+db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        callsign TEXT NOT NULL,
+        license TEXT NOT NULL,
+        logbook TEXT DEFAULT '[]'
+    )`);
+});
 
 // read the pgp keys
 const publicKey = await readKey({ armoredKey: config.publicKey });
@@ -47,6 +57,13 @@ const fldigiClient = xmlrpc.createClient({
 // shutdown function
 async function shutdown() {
     console.log("Shutting down...");
+    db.close((err) => {
+        if (err) {
+            console.error("Error closing db:", err.message);
+        } else {
+            console.log("Database (real database and not json btw) connection closed.");
+        }
+    });
 }
 
 // promisify callback
@@ -141,28 +158,35 @@ discordClient.on("interactionCreate", async (interaction) => {
 
             // get the user to be added :3
             const toAdd = interaction.options.getUser("user").id;
+            const callsign = interaction.options.getString("callsign");
+            const license = interaction.options.getString("license");
 
-            // return if the user to be added is already in the db
-            if (
-                db.data.users.filter((user) => user.id === toAdd).length !== 0
-            ) {
-                await interaction.editReply({
-                    content: "This user is already in the whitelist!",
+            // check if user exists using SQL :3
+            db.get("SELECT id FROM users WHERE id = ?", [toAdd], async (err, row) => {
+                if (err) {
+                    console.error("Database error:", err.message);
+                    await interaction.editReply({ content: "An error occurred checking the database." });
+                    return;
+                }
+
+                if (row) {
+                    await interaction.editReply({
+                        content: "This user is already in the whitelist!",
+                    });
+                    return;
+                }
+
+                // insert user using SQL :3
+                db.run("INSERT INTO users (id, callsign, license) VALUES (?, ?, ?)", [toAdd, callsign, license], async (insertErr) => {
+                    if (insertErr) {
+                        console.error("Database error:", insertErr.message);
+                        await interaction.editReply({ content: "An error occurred adding the user." });
+                        return;
+                    }
+                    await interaction.editReply({
+                        content: "This user has been added to the whitelist.",
+                    });
                 });
-                return;
-            }
-
-            await db.update(({ users }) =>
-                users.push({
-                    id: toAdd,
-                    callsign: interaction.options.getString("callsign"),
-                    license: interaction.options.getString("license"),
-                    logbook: [],
-                })
-            );
-
-            await interaction.editReply({
-                content: "This user has been added to the whitelist.",
             });
         }
         // del user command
@@ -176,62 +200,69 @@ discordClient.on("interactionCreate", async (interaction) => {
             }
 
             // get the id of the user to be deleted
-            const toDelete = db.data.users.find(
-                (user) => user.id === interaction.options.getString("user")
-            );
+            const toDeleteId = interaction.options.getString("user");
 
-            if (!toDelete) {
-                await interaction.editReply({
-                    content: "User is not in the database.",
-                });
-                return;
-            }
+            // delete user using SQL :3
+            db.run("DELETE FROM users WHERE id = ?", [toDeleteId], async function(err) {
+                if (err) {
+                    console.error("Database error:", err.message);
+                    await interaction.editReply({ content: "An error occurred deleting the user." });
+                    return;
+                }
 
-            await db.update(({ users }) =>
-                users.splice(users.indexOf(toDelete), 1)
-            );
-
-            await interaction.editReply({
-                content: "User has been deleted from the whitelist.",
+                if (this.changes === 0) {
+                     await interaction.editReply({
+                        content: "User is not in the database.",
+                    });
+                } else {
+                    await interaction.editReply({
+                        content: "User has been deleted from the whitelist.",
+                    });
+                }
             });
         }
         // request key command
         else if (command === "requestkey") {
-            // get the user requesting the thingy
-            const user = db.data.users.find(
-                (user) => user.id === interaction.user.id
-            );
+            // get the user requesting using SQL :3
+            const userId = interaction.user.id;
+            db.get("SELECT id, callsign, license FROM users WHERE id = ?", [userId], async (err, user) => {
+                 if (err) {
+                    console.error("Database error:", err.message);
+                    await interaction.editReply({ content: "An error occurred fetching user data." });
+                    return;
+                }
 
-            // return if user isn't in the db
-            if (!user) {
-                await interaction.editReply({
-                    content: "You are not in the whitelist.",
+                // return if user isn't in the db
+                if (!user) {
+                    await interaction.editReply({
+                        content: "You are not in the whitelist.",
+                    });
+                    return;
+                }
+
+                const message = await createCleartextMessage({
+                    text: JSON.stringify({
+                        callsign: user.callsign,
+                        license: user.license,
+                        id: user.id,
+                        url: state.url,
+                        expiration: Date.now() + config.keyExpiry * 1000,
+                    }),
                 });
-                return;
-            }
 
-            const message = await createCleartextMessage({
-                text: JSON.stringify({
-                    callsign: user.callsign,
-                    license: user.license,
-                    id: user.id,
-                    url: state.url,
-                    expiration: Date.now() + config.keyExpiry * 1000,
-                }),
-            });
+                const signed = await sign({
+                    message,
+                    signingKeys: privateKey,
+                });
 
-            const signed = await sign({
-                message,
-                signingKeys: privateKey,
-            });
-
-            await interaction.editReply({
-                content: "Below is your key.",
-                files: [
-                    new AttachmentBuilder(Buffer.from(signed)).setName(
-                        `${user.callsign}-${Date.now()}.txt`
-                    ),
-                ],
+                await interaction.editReply({
+                    content: "Below is your key.",
+                    files: [
+                        new AttachmentBuilder(Buffer.from(signed)).setName(
+                            `${user.callsign}-${Date.now()}.txt`
+                        ),
+                    ],
+                });
             });
         }
         // shutdown command
@@ -273,8 +304,6 @@ await discordClient.login(config.discordToken);
 
 // socket.io server
 const io = new Server(config.port);
-
-
 
 // connect ngrok!
 state.url = (
