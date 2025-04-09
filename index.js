@@ -465,7 +465,7 @@ io.on("connection", (socket) => {
 });
 
 // connect ngrok!
-state.url = (
+state.url = "http://" + (
     await ngrok.connect({
         authtoken: config.ngrokToken,
         proto: "tcp",
