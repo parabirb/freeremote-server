@@ -334,7 +334,7 @@ rtAudio.openStream(
         deviceId: config.audioInput,
         nChannels: 1,
     },
-    audify.RtAudioFormat.RTAUDIO_SINT16,
+    audify.RtAudioFormat.RTAUDIO_FLOAT32,
     config.sampleRate,
     (config.frameSize / 1000) * config.sampleRate,
     "remoteham",
