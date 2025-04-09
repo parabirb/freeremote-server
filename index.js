@@ -413,14 +413,14 @@ io.on("connection", (socket) => {
         }
         // TODO: VERIFY PRIVILEGES
         socket.pttTimeout = setTimeout(async () => {
-            await asyncRpc(flrigClient, "set_ptt", [0]);
+            await asyncRpc(flrigClient, "rig.set_ptt", [0]);
             state.transmitting = false;
             socket.emit("state", state);
             socket.pttTimeout = undefined;
             log(`${state.currentUser.callsign}'s PTT timed out.`);
         });
         state.transmitting = true;
-        await asyncRpc(flrigClient, "set_ptt", [1]);
+        await asyncRpc(flrigClient, "rig.set_ptt", [1]);
         socket.emit("state", state);
         log(
             `${state.currentUser.callsign} PTTed on ${
@@ -445,7 +445,7 @@ io.on("connection", (socket) => {
             clearTimeout(socket.pttTimeout);
             socket.pttTimeout = undefined;
         }
-        await asyncRpc(flrigClient, "set_ptt", [0]);
+        await asyncRpc(flrigClient, "rig.set_ptt", [0]);
         state.transmitting = false;
         log(
             `${state.currentUser.callsign} unPTTed on ${
