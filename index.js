@@ -32,7 +32,9 @@ const privateKey = await readPrivateKey({ armoredKey: config.privateKey });
 // state
 let state = {
     transmitting: false,
+    mode: "voice",
 };
+let currentSocket;
 
 // xmlrpc clients
 const flrigClient = xmlrpc.createClient({
@@ -58,6 +60,9 @@ function asyncRpc(client, method, params = []) {
         });
     });
 }
+
+// get the current vfo
+state.vfo = +(await asyncRpc(flrigClient, "rig.get_vfo"));
 
 // discord client
 const discordClient = new Client({
@@ -245,7 +250,7 @@ discordClient.on("interactionCreate", async (interaction) => {
             }
 
             await interaction.editReply({
-                content: "Shutting down."
+                content: "Shutting down.",
             });
 
             shutdown();
@@ -269,12 +274,132 @@ await rest.put(
     }
 );
 
+async function log(message) {
+    discordClient.channels.cache.get(config.loggingChannel).send(message);
+}
+
 await discordClient.login(config.discordToken);
+
+// rtAudio
+const rtAudio = new audify.RtAudio();
 
 // socket.io server
 const io = new Server(config.port);
 
+// create opus encoder
+const opusEncoder = new audify.OpusEncoder(config.sampleRate, 1, audify.OpusApplication.OPUS_APPLICATION_AUDIO);
 
+// create audio stream
+rtAudio.openStream(
+    {
+        deviceId: config.audioOutput,
+        nChannels: 1,
+    },
+    {
+        deviceId: config.audioInput,
+        nChannels: 1,
+    },
+    audify.RtAudioFormat.RTAUDIO_SINT16,
+    config.sampleRate,
+    (config.frameSize / 1000) * config.sampleRate,
+    "remoteham",
+    (pcm) => {
+        const encoded = opusEncoder.encode(pcm, (config.frameSize / 1000) * config.sampleRate);
+        if (currentSocket) currentSocket.emit("audio", encoded);
+    }
+);
+
+// stream
+rtAudio.start();
+
+// on connection
+io.on("connection", (socket) => {
+    // on authentication
+    socket.on("auth", async key => {
+        // return if there is a user currently logged in
+        if (state.currentUser) {
+            socket.emit("error", "A user is already logged in.");
+            return;
+        }
+        // otherwise, read the key
+        try {
+            let json = await readCleartextMessage({ cleartextMessage: key });
+            const verificationResult = await openpgp.verify({
+                message: json,
+                verificationKeys: publicKey,
+            });
+            await verificationResult.signatures[0].verified;
+            json = JSON.parse(json);
+            if (json.expiration > Date.now()) {
+                socket.emit("error", "Key is expired.");
+                return;
+            }
+            state.currentUser = {
+                callsign: json.callsign,
+                license: json.license,
+                id: json.id,
+            };
+            currentSocket = socket;
+            socket.currentUser = true;
+            // TODO: add timeout to log user out
+            socket.emit("login", {
+                sampleRate: config.sampleRate,
+                bands: config.bands
+            });
+            socket.emit("state", state);
+            log(
+                `${json.callsign} (<@${json.id}>) has logged into the remote station.`
+            );
+        } catch {
+            socket.emit("error", "Key could not be verified.");
+            return;
+        }
+    });
+    // on rx of sample rate
+    socket.on("sampleRate", rate => {
+        if (!socket.currentUser) {
+            socket.emit("error", "You are not authorized to use this function.");
+            return;
+        }
+        socket.sampleRate = rate;
+        socket.opusDecoder = new audify.OpusDecoder(rate, 1);
+    });
+    // on ptt
+    socket.on("ptt", async () => {
+        if (!socket.currentUser) {
+            socket.emit("error", "You are not authorized to use this function.");
+            return;
+        }
+        else if (state.mode !== "voice") {
+            socket.emit("error", "You cannot use the PTT command outside of voice mode.");
+            return;
+        }
+        socket.pttTimeout = setTimeout(async () => {
+            await asyncRpc(flrigClient, "set_ptt", [0]);
+            state.transmitting = false;
+            socket.emit("state", state);
+            socket.pttTimeout = undefined;
+        });
+        state.transmitting = true;
+        await asyncRpc(flrigClient, "set_ptt", [1]);
+        socket.emit("state", state);
+    });
+    // on unptt
+    socket.on("unptt", async () => {
+        if (!socket.currentUser) {
+            socket.emit("error", "You are not authorized to use this function.");
+            return;
+        }
+        else if (!state.transmitting) {
+            socket.emit("error", "PTT is already disengaged.");
+            socket.emit("state", state);
+            return;
+        }
+        clearTimeout(socket.pttTimeout);
+        await asyncRpc(flrigClient, "set_ptt", [0]);
+        state.transmitting = false;
+    });
+});
 
 // connect ngrok!
 state.url = (
