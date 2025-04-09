@@ -455,7 +455,10 @@ io.on("connection", (socket) => {
             socket.emit("state", state);
             return;
         }
-        clearTimeout(socket.pttTimeout);
+        if (socket.pttTimeout) {
+            clearTimeout(socket.pttTimeout);
+            socket.pttTimeout = undefined;
+        }
         await asyncRpc(flrigClient, "set_ptt", [0]);
         state.transmitting = false;
         log(

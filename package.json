@@ -1,14 +1,14 @@
 {
-  "name": "remoteham-server",
+  "name": "freeremote-server",
   "version": "1.0.0",
-  "description": "the server for remoteham, an open source, radio-agnostic program for remote station control.",
-  "homepage": "https://github.com/parabirb/remoteham-server#readme",
+  "description": "the server for freeremote, an open source, radio-agnostic program for remote station control.",
+  "homepage": "https://github.com/parabirb/freeremote-server#readme",
   "bugs": {
-    "url": "https://github.com/parabirb/remoteham-server/issues"
+    "url": "https://github.com/parabirb/freeremote-server/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/parabirb/remoteham-server.git"
+    "url": "git+https://github.com/parabirb/freeremote-server.git"
   },
   "license": "0BSD",
   "author": "parabirb",
