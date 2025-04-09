@@ -174,10 +174,8 @@ discordClient.on("interactionCreate", async (interaction) => {
                 });
                 return;
             }
-
             // get the user to be added :3
             const toAdd = interaction.options.getUser("user").id;
-
             // return if the user to be added is already in the db
             if (
                 db.data.users.filter((user) => user.id === toAdd).length !== 0
@@ -187,7 +185,6 @@ discordClient.on("interactionCreate", async (interaction) => {
                 });
                 return;
             }
-
             await db.update(({ users }) =>
                 users.push({
                     id: toAdd,
@@ -196,7 +193,6 @@ discordClient.on("interactionCreate", async (interaction) => {
                     logbook: [],
                 })
             );
-
             await interaction.editReply({
                 content: "This user has been added to the whitelist.",
             });
@@ -210,23 +206,19 @@ discordClient.on("interactionCreate", async (interaction) => {
                 });
                 return;
             }
-
             // get the id of the user to be deleted
             const toDelete = db.data.users.find(
                 (user) => user.id === interaction.options.getString("user")
             );
-
             if (!toDelete) {
                 await interaction.editReply({
                     content: "User is not in the database.",
                 });
                 return;
             }
-
             await db.update(({ users }) =>
                 users.splice(users.indexOf(toDelete), 1)
             );
-
             await interaction.editReply({
                 content: "User has been deleted from the whitelist.",
             });
@@ -237,7 +229,6 @@ discordClient.on("interactionCreate", async (interaction) => {
             const user = db.data.users.find(
                 (user) => user.id === interaction.user.id
             );
-
             // return if user isn't in the db
             if (!user) {
                 await interaction.editReply({
@@ -245,7 +236,6 @@ discordClient.on("interactionCreate", async (interaction) => {
                 });
                 return;
             }
-
             const message = await createCleartextMessage({
                 text: JSON.stringify({
                     callsign: user.callsign,
@@ -255,12 +245,10 @@ discordClient.on("interactionCreate", async (interaction) => {
                     expiration: Date.now() + config.keyExpiry * 1000,
                 }),
             });
-
             const signed = await sign({
                 message,
                 signingKeys: privateKey,
             });
-
             await interaction.editReply({
                 content: "Below is your key.",
                 files: [
@@ -279,11 +267,9 @@ discordClient.on("interactionCreate", async (interaction) => {
                 });
                 return;
             }
-
             await interaction.editReply({
                 content: "Shutting down.",
             });
-
             shutdown();
         }
     } catch (e) {
@@ -337,7 +323,7 @@ rtAudio.openStream(
     audify.RtAudioFormat.RTAUDIO_FLOAT32,
     config.sampleRate,
     (config.frameSize / 1000) * config.sampleRate,
-    "remoteham",
+    "freeremote",
     (pcm) => {
         const encoded = opusEncoder.encode(
             pcm,
@@ -387,7 +373,7 @@ io.on("connection", (socket) => {
                 sampleRate: config.sampleRate,
                 bands: config.bands,
                 clubName: config.clubName,
-                clubEmail: config.clubEmail
+                clubEmail: config.clubEmail,
             });
             socket.emit("state", state);
             log(
@@ -470,17 +456,19 @@ io.on("connection", (socket) => {
 });
 
 // connect ngrok!
-state.url = "http://" + (
-    await ngrok.connect({
-        authtoken: config.ngrokToken,
-        proto: "tcp",
-        addr: config.port,
-        onStatusChange: (status) => {
-            if (status !== "connected") {
-                console.log("Fuck");
-            }
-        },
-    })
-).replace("tcp://", "");
+state.url =
+    "http://" +
+    (
+        await ngrok.connect({
+            authtoken: config.ngrokToken,
+            proto: "tcp",
+            addr: config.port,
+            onStatusChange: (status) => {
+                if (status !== "connected") {
+                    console.log("Fuck");
+                }
+            },
+        })
+    ).replace("tcp://", "");
 
-console.log("remoteham is now up.");
+console.log("freeremote is now up.");
