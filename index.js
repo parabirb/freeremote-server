@@ -386,6 +386,8 @@ io.on("connection", (socket) => {
             socket.emit("login", {
                 sampleRate: config.sampleRate,
                 bands: config.bands,
+                clubName: config.clubName,
+                clubEmail: config.clubEmail
             });
             socket.emit("state", state);
             log(
