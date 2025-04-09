@@ -1,3 +1,4 @@
+// deps
 import ngrok from "ngrok";
 import audify from "audify";
 import xmlrpc from "xmlrpc";
@@ -62,7 +63,37 @@ function asyncRpc(client, method, params = []) {
 }
 
 // get the current vfo
-state.vfo = +(await asyncRpc(flrigClient, "rig.get_vfo"));
+state.frequency = +(await asyncRpc(flrigClient, "rig.get_vfo")) / 10;
+
+// verify operating privileges function
+function verifyPrivileges() {
+    // find the band the user is in
+    const band = Object.values(config.bands).find(
+        (band) =>
+            band.edges[0] <= state.frequency && band.edges[1] > state.frequency
+    );
+    if (!band) return false;
+    return (
+        (state.currentUser.license === "extra" ||
+            (state.currentUser.license === "general" &&
+                band.privileges.general.find(
+                    (privilege) =>
+                        privilege[0] <= state.frequency &&
+                        privilege[1] > state.frequency
+                )) ||
+            (state.currentUser.license === "technician" &&
+                band.privileges.technician &&
+                band.privileges.technician.find(
+                    (privilege) =>
+                        privilege[0] <= state.frequency &&
+                        privilege[1] > state.frequency
+                ))) &&
+        ((state.mode === "voice" &&
+            band.voice[0] <= state.frequency &&
+            band.voice[1] > state.frequency) ||
+            state.mode !== "voice")
+    );
+}
 
 // discord client
 const discordClient = new Client({
@@ -287,7 +318,11 @@ const rtAudio = new audify.RtAudio();
 const io = new Server(config.port);
 
 // create opus encoder
-const opusEncoder = new audify.OpusEncoder(config.sampleRate, 1, audify.OpusApplication.OPUS_APPLICATION_AUDIO);
+const opusEncoder = new audify.OpusEncoder(
+    config.sampleRate,
+    1,
+    audify.OpusApplication.OPUS_APPLICATION_AUDIO
+);
 
 // create audio stream
 rtAudio.openStream(
@@ -304,7 +339,10 @@ rtAudio.openStream(
     (config.frameSize / 1000) * config.sampleRate,
     "remoteham",
     (pcm) => {
-        const encoded = opusEncoder.encode(pcm, (config.frameSize / 1000) * config.sampleRate);
+        const encoded = opusEncoder.encode(
+            pcm,
+            (config.frameSize / 1000) * config.sampleRate
+        );
         if (currentSocket) currentSocket.emit("audio", encoded);
     }
 );
@@ -315,7 +353,7 @@ rtAudio.start();
 // on connection
 io.on("connection", (socket) => {
     // on authentication
-    socket.on("auth", async key => {
+    socket.on("auth", async (key) => {
         // return if there is a user currently logged in
         if (state.currentUser) {
             socket.emit("error", "A user is already logged in.");
@@ -330,7 +368,10 @@ io.on("connection", (socket) => {
             });
             await verificationResult.signatures[0].verified;
             json = JSON.parse(json);
-            if (json.expiration > Date.now()) {
+            if (
+                json.expiration > Date.now() ||
+                !db.data.users.find((user) => user.id === json.id)
+            ) {
                 socket.emit("error", "Key is expired.");
                 return;
             }
@@ -344,7 +385,7 @@ io.on("connection", (socket) => {
             // TODO: add timeout to log user out
             socket.emit("login", {
                 sampleRate: config.sampleRate,
-                bands: config.bands
+                bands: config.bands,
             });
             socket.emit("state", state);
             log(
@@ -356,9 +397,12 @@ io.on("connection", (socket) => {
         }
     });
     // on rx of sample rate
-    socket.on("sampleRate", rate => {
+    socket.on("sampleRate", (rate) => {
         if (!socket.currentUser) {
-            socket.emit("error", "You are not authorized to use this function.");
+            socket.emit(
+                "error",
+                "You are not authorized to use this function."
+            );
             return;
         }
         socket.sampleRate = rate;
@@ -367,30 +411,44 @@ io.on("connection", (socket) => {
     // on ptt
     socket.on("ptt", async () => {
         if (!socket.currentUser) {
-            socket.emit("error", "You are not authorized to use this function.");
+            socket.emit(
+                "error",
+                "You are not authorized to use this function."
+            );
+            return;
+        } else if (state.mode !== "voice") {
+            socket.emit(
+                "error",
+                "You cannot use the PTT command outside of voice mode."
+            );
             return;
         }
-        else if (state.mode !== "voice") {
-            socket.emit("error", "You cannot use the PTT command outside of voice mode.");
-            return;
-        }
+        // TODO: VERIFY PRIVILEGES
         socket.pttTimeout = setTimeout(async () => {
             await asyncRpc(flrigClient, "set_ptt", [0]);
             state.transmitting = false;
             socket.emit("state", state);
             socket.pttTimeout = undefined;
+            log(`${state.currentUser.callsign}'s PTT timed out.`);
         });
         state.transmitting = true;
         await asyncRpc(flrigClient, "set_ptt", [1]);
         socket.emit("state", state);
+        log(
+            `${state.currentUser.callsign} PTTed on ${
+                state.frequency / 100
+            } kHz.`
+        );
     });
     // on unptt
     socket.on("unptt", async () => {
         if (!socket.currentUser) {
-            socket.emit("error", "You are not authorized to use this function.");
+            socket.emit(
+                "error",
+                "You are not authorized to use this function."
+            );
             return;
-        }
-        else if (!state.transmitting) {
+        } else if (!state.transmitting) {
             socket.emit("error", "PTT is already disengaged.");
             socket.emit("state", state);
             return;
@@ -398,6 +456,11 @@ io.on("connection", (socket) => {
         clearTimeout(socket.pttTimeout);
         await asyncRpc(flrigClient, "set_ptt", [0]);
         state.transmitting = false;
+        log(
+            `${state.currentUser.callsign} unPTTed on ${
+                state.frequency / 100
+            } kHz.`
+        );
     });
 });
 
