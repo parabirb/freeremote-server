@@ -1,7 +1,5 @@
 import ngrok from "ngrok";
-import audify from "audify";
 import xmlrpc from "xmlrpc";
-import * as ft8 from "ft8js";
 import sqlite3 from "sqlite3";
 import config from "./config.js";
 import { Server } from "socket.io";
@@ -9,10 +7,8 @@ import { SlashCommandBuilder } from "@discordjs/builders";
 import {
     readKey,
     readPrivateKey,
-    readCleartextMessage,
     createCleartextMessage,
     sign,
-    verify,
 } from "openpgp";
 import {
     REST,
