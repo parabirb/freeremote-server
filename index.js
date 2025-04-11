@@ -5,7 +5,6 @@ import xmlrpc from "xmlrpc";
 import * as ft8 from "ft8js";
 import config from "./config.js";
 import { Server } from "socket.io";
-import { createServer } from "http";
 import { JSONFilePreset } from "lowdb/node";
 import { SlashCommandBuilder } from "@discordjs/builders";
 import {
@@ -322,13 +321,7 @@ await discordClient.login(config.discordToken);
 const rtAudio = new audify.RtAudio();
 
 // socket.io server
-const httpServer = createServer();
-const io = new Server(httpServer, {
-    cors: {
-        origin: "*",
-    },
-});
-httpServer.listen(config.port);
+const io = new Server(config.port);
 
 // create opus encoder
 const opusEncoder = new audify.OpusEncoder(
@@ -537,19 +530,15 @@ io.on("connection", (socket) => {
 });
 
 // connect ngrok!
-state.url =
-    "http://" +
-    (
-        await ngrok.connect({
-            authtoken: config.ngrokToken,
-            proto: "tcp",
-            addr: config.port,
-            onStatusChange: (status) => {
-                if (status !== "connected") {
-                    console.log("Fuck");
-                }
-            },
-        })
-    ).replace("tcp://", "");
+state.url = await ngrok.connect({
+    authtoken: config.ngrokToken,
+    addr: config.port,
+    onStatusChange: (status) => {
+        if (status !== "connected") {
+            console.log("Fuck");
+        }
+    },
+    request_header_add: ["Access-Control-Allow-Origin:*"],
+});
 
 console.log("freeremote is now up.");
