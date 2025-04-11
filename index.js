@@ -443,8 +443,8 @@ io.on("connection", (socket) => {
             return;
         } else if (!verifyPrivileges()) {
             socket.emit("error");
+            return;
         }
-        // TODO: VERIFY PRIVILEGES
         socket.pttTimeout = setTimeout(async () => {
             await asyncRpc(flrigClient, "rig.set_ptt", [0]);
             state.transmitting = false;
@@ -513,6 +513,7 @@ io.on("connection", (socket) => {
             )
         ) {
             socket.emit("error", "The frequency provided is out of band.");
+            return;
         }
         // note that we add 0.1hz to the frequency being sent bc of xmlrpc fuckery--we need the lib to parse this as a double, not an int
         await asyncRpc(flrigClient, "rig.set_vfo", [frequency * 10 + 0.1]);
