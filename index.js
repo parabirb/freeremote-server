@@ -324,6 +324,7 @@ const rtAudio = new audify.RtAudio();
 const io = new Server(config.port, {
     cors: {
         origin: "*",
+        methods: ["GET", "POST"],
     },
 });
 
