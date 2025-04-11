@@ -413,7 +413,8 @@ io.on("connection", (socket) => {
             log(
                 `${json.callsign} (<@${json.id}>) has logged into the remote station.`
             );
-        } catch {
+        } catch (e) {
+            console.log(e);
             socket.emit("error", "Key could not be verified.");
             return;
         }
