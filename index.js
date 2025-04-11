@@ -384,7 +384,7 @@ io.on("connection", (socket) => {
     // on authentication
     socket.on("auth", async (key) => {
         // return if there is a user currently logged in
-        if (socket.currentUser) {
+        if (state.currentUser) {
             socket.emit("error", "A user is already logged in.");
             return;
         }
