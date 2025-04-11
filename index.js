@@ -386,7 +386,9 @@ io.on("connection", (socket) => {
                 message: json,
                 verificationKeys: publicKey,
             });
+            console.log(json);
             await verificationResult.signatures[0].verified;
+            console.log(json);
             json = JSON.parse(json);
             if (
                 json.expiration > Date.now() ||
