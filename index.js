@@ -64,7 +64,7 @@ function asyncRpc(client, method, params = []) {
 
 // get the current vfo and max pwr
 state.frequency = +(await asyncRpc(flrigClient, "rig.get_vfo")) / 10;
-state.maxpwr = +(await asyncRpc(flrigClient, "rig.get_maxpwr"))
+state.maxpwr = +(await asyncRpc(flrigClient, "rig.get_maxpwr"));
 
 // verify operating privileges function
 function verifyPrivileges() {
@@ -157,7 +157,9 @@ const shutdownCommand = new SlashCommandBuilder()
 
 const inUseCommand = new SlashCommandBuilder()
     .setName("inuse")
-    .setDescription("Returns information on whether the station is in use or not.");
+    .setDescription(
+        "Returns information on whether the station is in use or not."
+    );
 
 discordClient.on("interactionCreate", async (interaction) => {
     try {
@@ -281,12 +283,11 @@ discordClient.on("interactionCreate", async (interaction) => {
         else if (command === "inuse") {
             if (!state.currentUser) {
                 await interaction.editReply({
-                    content: "The station is not in use right now."
+                    content: "The station is not in use right now.",
                 });
-            }
-            else {
+            } else {
                 await interaction.editReply({
-                    content: `The station is currently in use by <@${state.currentUser.id}> (${state.currentUser.callsign})`
+                    content: `The station is currently in use by <@${state.currentUser.id}> (${state.currentUser.callsign})`,
                 });
             }
         }
@@ -305,6 +306,7 @@ await rest.put(
             delUserCommand,
             requestKeyCommand,
             shutdownCommand,
+            inUseCommand,
         ],
     }
 );
@@ -321,8 +323,8 @@ const rtAudio = new audify.RtAudio();
 // socket.io server
 const io = new Server(config.port, {
     cors: {
-        origin: "*"
-    }
+        origin: "*",
+    },
 });
 
 // create opus encoder
@@ -367,8 +369,7 @@ setInterval(async () => {
     else if (transmitting) {
         currentSocket.emit("swr", +asyncRpc(flrigClient, "rig.get_swrmeter"));
         currentSocket.emit("pwr", +asyncRpc(flrigClient, "rig.get_pwrmeter"));
-    }
-    else {
+    } else {
         currentSocket.emit("dbm", +asyncRpc(flrigClient, "rig.get_DBM"));
     }
 }, 100);
@@ -529,7 +530,7 @@ io.on("connection", (socket) => {
         }
         currentSocket = undefined;
         state.currentUser = undefined;
-    })
+    });
 });
 
 // connect ngrok!
