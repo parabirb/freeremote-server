@@ -538,7 +538,7 @@ state.url = await ngrok.connect({
             console.log("Fuck");
         }
     },
-    response_header_add: ["Access-Control-Allow-Origin:*"],
+    response_header_add: ["Access-Control-Allow-Origin: *"],
 });
 
 console.log("freeremote is now up.");
