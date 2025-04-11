@@ -389,7 +389,7 @@ io.on("connection", (socket) => {
             await verificationResult.signatures[0].verified;
             json = JSON.parse(json.text);
             if (
-                json.expiration > Date.now() ||
+                json.expiration < Date.now() ||
                 !db.data.users.find((user) => user.id === json.id)
             ) {
                 socket.emit("error", "Key is expired.");
