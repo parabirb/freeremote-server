@@ -62,8 +62,9 @@ function asyncRpc(client, method, params = []) {
     });
 }
 
-// get the current vfo
+// get the current vfo and max pwr
 state.frequency = +(await asyncRpc(flrigClient, "rig.get_vfo")) / 10;
+state.maxpwr = +(await asyncRpc(flrigClient, "rig.get_maxpwr"))
 
 // verify operating privileges function
 function verifyPrivileges() {
@@ -153,6 +154,10 @@ const requestKeyCommand = new SlashCommandBuilder()
 const shutdownCommand = new SlashCommandBuilder()
     .setName("shutdown")
     .setDescription("Shut down the server.");
+
+const inUseCommand = new SlashCommandBuilder()
+    .setName("inuse")
+    .setDescription("Returns information on whether the station is in use or not.");
 
 discordClient.on("interactionCreate", async (interaction) => {
     try {
@@ -272,6 +277,19 @@ discordClient.on("interactionCreate", async (interaction) => {
             });
             shutdown();
         }
+        // in use command
+        else if (command === "inuse") {
+            if (!state.currentUser) {
+                await interaction.editReply({
+                    content: "The station is not in use right now."
+                });
+            }
+            else {
+                await interaction.editReply({
+                    content: `The station is currently in use by <@${state.currentUser.id}> (${state.currentUser.callsign})`
+                });
+            }
+        }
     } catch (e) {
         console.log(e);
     }
@@ -301,7 +319,11 @@ await discordClient.login(config.discordToken);
 const rtAudio = new audify.RtAudio();
 
 // socket.io server
-const io = new Server(config.port);
+const io = new Server(config.port, {
+    cors: {
+        origin: "*"
+    }
+});
 
 // create opus encoder
 const opusEncoder = new audify.OpusEncoder(
@@ -309,8 +331,14 @@ const opusEncoder = new audify.OpusEncoder(
     1,
     audify.OpusApplication.OPUS_APPLICATION_AUDIO
 );
+const opusDecoder = new audify.OpusDecoder(
+    config.sampleRate,
+    1,
+    audify.OpusApplication.OPUS_APPLICATION_AUDIO
+);
 
 // create audio stream
+const frameSize = (config.frameSize / 1000) * config.sampleRate;
 rtAudio.openStream(
     {
         deviceId: config.audioOutput,
@@ -322,13 +350,10 @@ rtAudio.openStream(
     },
     audify.RtAudioFormat.RTAUDIO_FLOAT32,
     config.sampleRate,
-    (config.frameSize / 1000) * config.sampleRate,
+    frameSize,
     "freeremote",
     (pcm) => {
-        const encoded = opusEncoder.encode(
-            pcm,
-            (config.frameSize / 1000) * config.sampleRate
-        );
+        const encoded = opusEncoder.encodeFloat(pcm, frameSize);
         if (currentSocket) currentSocket.emit("audio", encoded);
     }
 );
@@ -336,19 +361,31 @@ rtAudio.openStream(
 // stream
 rtAudio.start();
 
+// set an interval to check the meters and occasionally send stuff to the client
+setInterval(async () => {
+    if (!currentSocket) return;
+    else if (transmitting) {
+        currentSocket.emit("swr", +asyncRpc(flrigClient, "rig.get_swrmeter"));
+        currentSocket.emit("pwr", +asyncRpc(flrigClient, "rig.get_pwrmeter"));
+    }
+    else {
+        currentSocket.emit("dbm", +asyncRpc(flrigClient, "rig.get_DBM"));
+    }
+}, 100);
+
 // on connection
 io.on("connection", (socket) => {
     // on authentication
     socket.on("auth", async (key) => {
         // return if there is a user currently logged in
-        if (state.currentUser) {
+        if (socket.currentUser) {
             socket.emit("error", "A user is already logged in.");
             return;
         }
         // otherwise, read the key
         try {
             let json = await readCleartextMessage({ cleartextMessage: key });
-            const verificationResult = await openpgp.verify({
+            const verificationResult = await verify({
                 message: json,
                 verificationKeys: publicKey,
             });
@@ -384,18 +421,6 @@ io.on("connection", (socket) => {
             return;
         }
     });
-    // on rx of sample rate
-    socket.on("sampleRate", (rate) => {
-        if (!socket.currentUser) {
-            socket.emit(
-                "error",
-                "You are not authorized to use this function."
-            );
-            return;
-        }
-        socket.sampleRate = rate;
-        socket.opusDecoder = new audify.OpusDecoder(rate, 1);
-    });
     // on ptt
     socket.on("ptt", async () => {
         if (!socket.currentUser) {
@@ -410,6 +435,8 @@ io.on("connection", (socket) => {
                 "You cannot use the PTT command outside of voice mode."
             );
             return;
+        } else if (!verifyPrivileges()) {
+            socket.emit("error");
         }
         // TODO: VERIFY PRIVILEGES
         socket.pttTimeout = setTimeout(async () => {
@@ -453,6 +480,56 @@ io.on("connection", (socket) => {
             } kHz.`
         );
     });
+    // on audio
+    socket.on("audio", async (chunk) => {
+        if (
+            !socket.currentUser ||
+            !state.transmitting ||
+            state.mode !== "voice"
+        )
+            return;
+        const decoded = opusDecoder.decodeFloat(chunk);
+        if (decoded.length !== frameSize * 4) return;
+        rtAudio.write(decoded);
+    });
+    // on frequency change
+    socket.on("frequency", async (frequency) => {
+        if (!socket.currentUser) {
+            socket.emit(
+                "error",
+                "You are not authorized to use this function."
+            );
+            return;
+        } else if (
+            !Object.values(config.bands).find(
+                (band) =>
+                    band.edges[0] <= frequency && band.edges[1] > frequency
+            )
+        ) {
+            socket.emit("error", "The frequency provided is out of band.");
+        }
+        // note that we add 0.1hz to the frequency being sent bc of xmlrpc fuckery--we need the lib to parse this as a double, not an int
+        state.frequency =
+            (await asyncRpc(flrigClient, "rig.set_vfo", [
+                frequency * 10 + 0.1,
+            ])) / 10;
+        socket.emit("state", state);
+        log(
+            `${state.currentUser.callsign} changed the frequency to ${
+                state.frequency / 100
+            } kHz.`
+        );
+    });
+    // on disconnect
+    socket.on("disconnect", async () => {
+        if (!socket.currentUser) return;
+        else if (socket.pttTimeout) {
+            await asyncRpc(flrigClient, "rig.set_ptt", [0]);
+            state.transmitting = false;
+        }
+        currentSocket = undefined;
+        state.currentUser = undefined;
+    })
 });
 
 // connect ngrok!

@@ -1,5 +1,5 @@
+import config from "./config.js";
 import { generateKey } from "openpgp";
-import config from "./config.json" with { type: "json" };
 
 const { publicKey, privateKey } = await generateKey({
     curve: "ed25519",
