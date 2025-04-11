@@ -1,8 +1,8 @@
 // deps
-import ngrok from "ngrok";
 import audify from "audify";
 import xmlrpc from "xmlrpc";
 import * as ft8 from "ft8js";
+import ngrok from "@ngrok/ngrok";
 import config from "./config.js";
 import { Server } from "socket.io";
 import { JSONFilePreset } from "lowdb/node";
@@ -530,15 +530,12 @@ io.on("connection", (socket) => {
 });
 
 // connect ngrok!
-state.url = await ngrok.connect({
+const listener = await ngrok.forward({
     authtoken: config.ngrokToken,
     addr: config.port,
-    onStatusChange: (status) => {
-        if (status !== "connected") {
-            console.log("Fuck");
-        }
-    },
     response_header_add: ["Access-Control-Allow-Origin: *"],
 });
+
+state.url = listener.url();
 
 console.log("freeremote is now up.");
