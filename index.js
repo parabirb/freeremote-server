@@ -331,12 +331,12 @@ const io = new Server(config.port, {
 const opusEncoder = new audify.OpusEncoder(
     config.sampleRate,
     1,
-    audify.OpusApplication.OPUS_APPLICATION_AUDIO
+    audify.OpusApplication.OPUS_APPLICATION_VOIP
 );
 const opusDecoder = new audify.OpusDecoder(
     config.sampleRate,
     1,
-    audify.OpusApplication.OPUS_APPLICATION_AUDIO
+    audify.OpusApplication.OPUS_APPLICATION_VOIP
 );
 
 // create audio stream
