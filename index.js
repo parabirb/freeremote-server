@@ -386,10 +386,8 @@ io.on("connection", (socket) => {
                 message: json,
                 verificationKeys: publicKey,
             });
-            console.log(json);
             await verificationResult.signatures[0].verified;
-            console.log(json);
-            json = JSON.parse(json);
+            json = JSON.parse(json.text);
             if (
                 json.expiration > Date.now() ||
                 !db.data.users.find((user) => user.id === json.id)
@@ -415,8 +413,7 @@ io.on("connection", (socket) => {
             log(
                 `${json.callsign} (<@${json.id}>) has logged into the remote station.`
             );
-        } catch (e) {
-            console.log(e);
+        } catch {
             socket.emit("error", "Key could not be verified.");
             return;
         }
