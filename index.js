@@ -363,10 +363,19 @@ rtAudio.start();
 setInterval(async () => {
     if (!currentSocket) return;
     else if (state.transmitting) {
-        currentSocket.emit("swr", +asyncRpc(flrigClient, "rig.get_swrmeter"));
-        currentSocket.emit("pwr", +asyncRpc(flrigClient, "rig.get_pwrmeter"));
+        currentSocket.emit(
+            "swr",
+            +(await asyncRpc(flrigClient, "rig.get_swrmeter"))
+        );
+        currentSocket.emit(
+            "pwr",
+            +(await asyncRpc(flrigClient, "rig.get_pwrmeter"))
+        );
     } else {
-        currentSocket.emit("dbm", +asyncRpc(flrigClient, "rig.get_DBM"));
+        currentSocket.emit(
+            "dbm",
+            +(await asyncRpc(flrigClient, "rig.get_DBM"))
+        );
     }
 }, 100);
 
@@ -442,7 +451,7 @@ io.on("connection", (socket) => {
             socket.emit("state", state);
             socket.pttTimeout = undefined;
             log(`${state.currentUser.callsign}'s PTT timed out.`);
-        });
+        }, config.pttTimeout * 1000);
         state.transmitting = true;
         await asyncRpc(flrigClient, "rig.set_ptt", [1]);
         socket.emit("state", state);
@@ -506,10 +515,8 @@ io.on("connection", (socket) => {
             socket.emit("error", "The frequency provided is out of band.");
         }
         // note that we add 0.1hz to the frequency being sent bc of xmlrpc fuckery--we need the lib to parse this as a double, not an int
-        state.frequency =
-            (await asyncRpc(flrigClient, "rig.set_vfo", [
-                frequency * 10 + 0.1,
-            ])) / 10;
+        await asyncRpc(flrigClient, "rig.set_vfo", [frequency * 10 + 0.1]);
+        state.frequency = +(await asyncRpc(flrigClient, "rig.get_vfo")) / 10;
         socket.emit("state", state);
         log(
             `${state.currentUser.callsign} changed the frequency to ${
@@ -523,7 +530,9 @@ io.on("connection", (socket) => {
         else if (socket.pttTimeout) {
             await asyncRpc(flrigClient, "rig.set_ptt", [0]);
             state.transmitting = false;
+            clearTimeout(socket.pttTimeout);
         }
+        log(`${state.currentUser.callsign} logged out.`);
         currentSocket = undefined;
         state.currentUser = undefined;
     });
