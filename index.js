@@ -362,7 +362,7 @@ rtAudio.start();
 // set an interval to check the meters and occasionally send stuff to the client
 setInterval(async () => {
     if (!currentSocket) return;
-    else if (transmitting) {
+    else if (state.transmitting) {
         currentSocket.emit("swr", +asyncRpc(flrigClient, "rig.get_swrmeter"));
         currentSocket.emit("pwr", +asyncRpc(flrigClient, "rig.get_pwrmeter"));
     } else {
