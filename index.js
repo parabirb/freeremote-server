@@ -5,6 +5,7 @@ import xmlrpc from "xmlrpc";
 import * as ft8 from "ft8js";
 import config from "./config.js";
 import { Server } from "socket.io";
+import { createServer } from "http";
 import { JSONFilePreset } from "lowdb/node";
 import { SlashCommandBuilder } from "@discordjs/builders";
 import {
@@ -321,12 +322,13 @@ await discordClient.login(config.discordToken);
 const rtAudio = new audify.RtAudio();
 
 // socket.io server
-const io = new Server(config.port, {
+const httpServer = createServer();
+const io = new Server(httpServer, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"],
     },
 });
+httpServer.listen(config.port);
 
 // create opus encoder
 const opusEncoder = new audify.OpusEncoder(
