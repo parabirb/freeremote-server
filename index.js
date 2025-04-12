@@ -287,7 +287,7 @@ discordClient.on("interactionCreate", async (interaction) => {
                 });
             } else {
                 await interaction.editReply({
-                    content: `The station is currently in use by <@${state.currentUser.id}> (${state.currentUser.callsign})`,
+                    content: `The station is currently being used by <@${state.currentUser.id}> (${state.currentUser.callsign}).`,
                 });
             }
         }
