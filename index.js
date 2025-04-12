@@ -494,9 +494,15 @@ io.on("connection", (socket) => {
             state.mode !== "voice"
         )
             return;
-        const decoded = opusDecoder.decodeFloat(chunk);
-        if (decoded.length !== frameSize * 4) return;
-        rtAudio.write(decoded);
+        console.log(chunk);
+        try {
+            const decoded = opusDecoder.decodeFloat(chunk);
+            if (decoded.length !== frameSize * 4) return;
+            rtAudio.write(decoded);
+        } catch (e) {
+            console.log(e);
+            return;
+        }
     });
     // on frequency change
     socket.on("frequency", async (frequency) => {
