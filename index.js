@@ -494,7 +494,6 @@ io.on("connection", (socket) => {
             state.mode !== "voice"
         )
             return;
-        console.log(chunk);
         try {
             const decoded = opusDecoder.decodeFloat(chunk, frameSize);
             if (decoded.length !== frameSize * 4) return;
