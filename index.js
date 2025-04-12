@@ -327,12 +327,12 @@ const io = new Server(config.port);
 const opusEncoder = new audify.OpusEncoder(
     config.sampleRate,
     1,
-    audify.OpusApplication.OPUS_APPLICATION_VOIP
+    audify.OpusApplication.OPUS_APPLICATION_AUDIO
 );
 const opusDecoder = new audify.OpusDecoder(
     config.sampleRate,
     1,
-    audify.OpusApplication.OPUS_APPLICATION_VOIP
+    audify.OpusApplication.OPUS_APPLICATION_AUDIO
 );
 
 // create audio stream
@@ -360,6 +360,7 @@ rtAudio.openStream(
 rtAudio.start();
 
 // set an interval to check the meters and occasionally send stuff to the client
+// TODO: tx cutoff based on swr
 setInterval(async () => {
     if (!currentSocket) return;
     else if (state.transmitting) {
