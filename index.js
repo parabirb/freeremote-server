@@ -496,11 +496,10 @@ io.on("connection", (socket) => {
             return;
         console.log(chunk);
         try {
-            const decoded = opusDecoder.decodeFloat(chunk);
+            const decoded = opusDecoder.decodeFloat(chunk, frameSize);
             if (decoded.length !== frameSize * 4) return;
             rtAudio.write(decoded);
         } catch (e) {
-            console.log(e);
             return;
         }
     });
