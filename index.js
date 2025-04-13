@@ -512,7 +512,7 @@ io.on("connection", (socket) => {
                 "You are not authorized to use this function."
             );
             return;
-        } else if (transmitting) {
+        } else if (state.transmitting) {
             socket.emit(
                 "error",
                 "You cannot change the VFO while transmitting."
