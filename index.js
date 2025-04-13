@@ -571,11 +571,6 @@ io.on("connection", (socket) => {
         await asyncRpc(flrigClient, "rig.set_vfo", [frequency * 10 + 0.1]);
         state.frequency = +(await asyncRpc(flrigClient, "rig.get_vfo")) / 10;
         socket.emit("state", state);
-        log(
-            `${state.currentUser.callsign} changed the frequency to ${
-                state.frequency / 100
-            } kHz.`
-        );
     });
     // on tune
     socket.on("tune", async () => {
