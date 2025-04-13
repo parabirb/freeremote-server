@@ -511,11 +511,25 @@ io.on("connection", (socket) => {
                 "You are not authorized to use this function."
             );
             return;
+        } else if (transmitting) {
+            socket.emit(
+                "error",
+                "You cannot change the VFO while transmitting."
+            );
+            return;
         } else if (
             !Object.values(config.bands).find(
                 (band) =>
                     band.edges[0] <= frequency && band.edges[1] > frequency
-            )
+            ) ||
+            (state.mode === "ft8" &&
+                !Object.values(config.bands).find(
+                    (band) => band.ft8 === frequency
+                )) ||
+            (state.mode === "psk31" &&
+                !Object.values(config.bands).find(
+                    (band) => band.psk31 === frequency
+                ))
         ) {
             socket.emit("error", "The frequency provided is out of band.");
             return;
