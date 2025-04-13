@@ -51,6 +51,9 @@ const fldigiClient = xmlrpc.createClient({
 // shutdown function
 async function shutdown() {
     console.log("Shutting down...");
+    if (currentSocket) currentSocket.disconnect();
+    await asyncRpc(flrigClient, "rig.set_ptt", [0]);
+    process.exit(0);
 }
 
 // promisify callback
@@ -368,16 +371,12 @@ setInterval(async () => {
         if (swr >= config.swrCutoff) {
             await asyncRpc(flrigClient, "rig.set_ptt", [0]);
             clearTimeout(currentSocket.pttTimeout);
-            currentSocket.pttTimeout = undefined;
             state.transmitting = false;
             socket.emit("error", "Transmission was aborted due to high SWR.");
             socket.emit("state", state);
             return;
         }
-        currentSocket.emit(
-            "swr",
-            swr
-        );
+        currentSocket.emit("swr", swr);
         currentSocket.emit(
             "pwr",
             +(await asyncRpc(flrigClient, "rig.get_pwrmeter"))
@@ -445,7 +444,6 @@ io.on("connection", (socket) => {
             };
             currentSocket = socket;
             socket.currentUser = true;
-            // TODO: add timeout to log user out
             socket.emit("login", {
                 sampleRate: config.sampleRate,
                 bands: config.bands,
@@ -483,7 +481,6 @@ io.on("connection", (socket) => {
             await asyncRpc(flrigClient, "rig.set_ptt", [0]);
             state.transmitting = false;
             socket.emit("state", state);
-            socket.pttTimeout = undefined;
             log(`${state.currentUser.callsign}'s PTT timed out.`);
         }, config.pttTimeout * 1000);
         state.transmitting = true;
@@ -508,10 +505,7 @@ io.on("connection", (socket) => {
             socket.emit("state", state);
             return;
         }
-        if (socket.pttTimeout) {
-            clearTimeout(socket.pttTimeout);
-            socket.pttTimeout = undefined;
-        }
+        if (socket.pttTimeout) clearTimeout(socket.pttTimeout);
         await asyncRpc(flrigClient, "rig.set_ptt", [0]);
         state.transmitting = false;
         socket.emit("state", state);
@@ -584,10 +578,12 @@ io.on("connection", (socket) => {
     // on tune
     socket.on("tune", async () => {
         if (!socket.currentUser) {
-            socket.emit("error", "You are not authorized to use this function.");
+            socket.emit(
+                "error",
+                "You are not authorized to use this function."
+            );
             return;
-        }
-        else if (!config.tunable) {
+        } else if (!config.tunable) {
             socket.emit("error", "This station cannot be tuned.");
             return;
         }
@@ -659,7 +655,7 @@ io.on("connection", (socket) => {
     // on disconnect
     socket.on("disconnect", async () => {
         if (!socket.currentUser) return;
-        else if (socket.pttTimeout) {
+        else if (state.transmitting) {
             await asyncRpc(flrigClient, "rig.set_ptt", [0]);
             state.transmitting = false;
             clearTimeout(socket.pttTimeout);
