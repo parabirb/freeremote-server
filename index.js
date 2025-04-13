@@ -368,12 +368,13 @@ setInterval(async () => {
     if (!currentSocket) return;
     else if (state.transmitting) {
         let swr = +(await asyncRpc(flrigClient, "rig.get_swrmeter"));
+        console.log(swr);
         if (swr >= config.swrCutoff) {
             await asyncRpc(flrigClient, "rig.set_ptt", [0]);
             clearTimeout(currentSocket.pttTimeout);
             state.transmitting = false;
-            socket.emit("error", "Transmission was aborted due to high SWR.");
-            socket.emit("state", state);
+            currentSocket.emit("error", "Transmission was aborted due to high SWR.");
+            currentSocket.emit("state", state);
             return;
         }
         currentSocket.emit("swr", swr);
