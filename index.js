@@ -364,19 +364,20 @@ rtAudio.openStream(
 rtAudio.start();
 
 // set an interval to check the meters and occasionally send stuff to the client
+let lastSwr;
 setInterval(async () => {
     if (!currentSocket) return;
     else if (state.transmitting) {
         let swr = +(await asyncRpc(flrigClient, "rig.get_swrmeter"));
-        console.log(swr);
-        if (swr >= config.swrCutoff) {
+        if (swr >= config.swrCutoff && lastSwr >= config.swrCutoff) {
+            state.transmitting = false;
             await asyncRpc(flrigClient, "rig.set_ptt", [0]);
             clearTimeout(currentSocket.pttTimeout);
-            state.transmitting = false;
             currentSocket.emit("error", "Transmission was aborted due to high SWR.");
             currentSocket.emit("state", state);
             return;
         }
+        lastSwr = swr;
         currentSocket.emit("swr", swr);
         currentSocket.emit(
             "pwr",
