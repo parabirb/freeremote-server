@@ -1,4 +1,5 @@
 // deps
+import Joi from "joi";
 import audify from "audify";
 import xmlrpc from "xmlrpc";
 import * as ft8 from "ft8js";
@@ -380,6 +381,29 @@ setInterval(async () => {
     }
 }, 100);
 
+// schemas
+const logbookEntry = Joi.object({
+    FREQ: Joi.string()
+        .custom((value, helpers) => {
+            if (isNaN(+value)) return helpers.error("any.invalid");
+            else return value;
+        })
+        .required(),
+    QSO_DATE: Joi.string()
+        .pattern(/^[0-9]{8}$/)
+        .required(),
+    TIME_ON: Joi.string()
+        .pattern(/^[0-9]{6}$/)
+        .required(),
+    CALL: Joi.string()
+        .pattern(/^[A-Z0-9]{3,15}$/)
+        .required(),
+    MODE: Joi.string().min(2).max(8).required(),
+    RST_RCVD: Joi.string().min(1).max(8).required(),
+    RST_SENT: Joi.string().min(1).max(8).required(),
+});
+const logbookSchema = Joi.array().items(logbookEntry, Joi.any().strip());
+
 // on connection
 io.on("connection", (socket) => {
     // on authentication
@@ -518,6 +542,9 @@ io.on("connection", (socket) => {
                 "You cannot change the VFO while transmitting."
             );
             return;
+        } else if (typeof frequency !== "number") {
+            socket.emit("error", "Frequency must be a number.");
+            return;
         } else if (
             !Object.values(config.bands).find(
                 (band) =>
@@ -545,6 +572,69 @@ io.on("connection", (socket) => {
             } kHz.`
         );
     });
+    // on logbook request
+    socket.on("getLogbook", () => {
+        if (!socket.currentUser) {
+            socket.emit(
+                "error",
+                "You are not authorized to use this function."
+            );
+            return;
+        }
+        return db.data.users.find((user) => user.id === state.currentUser.id)
+            .logbook;
+    });
+    // on new logbook entry
+    socket.on("newEntry", async (entry) => {
+        if (!socket.currentUser) {
+            socket.emit(
+                "error",
+                "You are not authorized to use this function."
+            );
+            return;
+        }
+        let result = logbookEntry.validate(entry);
+        if (result.error) {
+            socket.emit("error", "Invalid logbook entry.");
+            return;
+        }
+        await db.update(({ users }) =>
+            users
+                .find((user) => user.id === state.currentUser.id)
+                .logbook.unshift(result.value)
+        );
+        socket.emit(
+            "logbook",
+            db.data.users.find((user) => user.id === state.currentUser.id)
+                .logbook
+        );
+    });
+    // on logbook update
+    socket.on("updateLogbook", async (logbook) => {
+        if (!socket.currentUser) {
+            socket.emit(
+                "error",
+                "You are not authorized to use this function."
+            );
+            return;
+        }
+        let result = logbookSchema.validate(logbook);
+        if (result.error) {
+            socket.emit("error", "Invalid logbook.");
+            return;
+        }
+        await db.update(
+            ({ users }) =>
+                (users.find(
+                    (user) => user.id === state.currentUser.id
+                ).logbook = result.value)
+        );
+        socket.emit(
+            "logbook",
+            db.data.users.find((user) => user.id === state.currentUser.id)
+                .logbook
+        );
+    });
     // on disconnect
     socket.on("disconnect", async () => {
         if (!socket.currentUser) return;
@@ -556,6 +646,7 @@ io.on("connection", (socket) => {
         log(`${state.currentUser.callsign} logged out.`);
         currentSocket = undefined;
         state.currentUser = undefined;
+        socket.currentUser = false;
     });
 });
 
