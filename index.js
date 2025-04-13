@@ -373,7 +373,10 @@ setInterval(async () => {
             state.transmitting = false;
             await asyncRpc(flrigClient, "rig.set_ptt", [0]);
             clearTimeout(currentSocket.pttTimeout);
-            currentSocket.emit("error", "Transmission was aborted due to high SWR.");
+            currentSocket.emit(
+                "error",
+                "Transmission was aborted due to high SWR."
+            );
             currentSocket.emit("state", state);
             return;
         }
@@ -476,7 +479,10 @@ io.on("connection", (socket) => {
             );
             return;
         } else if (!verifyPrivileges()) {
-            socket.emit("error");
+            socket.emit(
+                "error",
+                "You are attempting to transmit outside of your privileges."
+            );
             return;
         }
         socket.pttTimeout = setTimeout(async () => {
