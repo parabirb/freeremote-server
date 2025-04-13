@@ -481,6 +481,7 @@ io.on("connection", (socket) => {
         }
         await asyncRpc(flrigClient, "rig.set_ptt", [0]);
         state.transmitting = false;
+        socket.emit("state", state);
         log(
             `${state.currentUser.callsign} unPTTed on ${
                 state.frequency / 100
