@@ -361,13 +361,22 @@ rtAudio.openStream(
 rtAudio.start();
 
 // set an interval to check the meters and occasionally send stuff to the client
-// TODO: tx cutoff based on swr
 setInterval(async () => {
     if (!currentSocket) return;
     else if (state.transmitting) {
+        let swr = +(await asyncRpc(flrigClient, "rig.get_swrmeter"));
+        if (swr >= config.swrCutoff) {
+            await asyncRpc(flrigClient, "rig.set_ptt", [0]);
+            clearTimeout(currentSocket.pttTimeout);
+            currentSocket.pttTimeout = undefined;
+            state.transmitting = false;
+            socket.emit("error", "Transmission was aborted due to high SWR.");
+            socket.emit("state", state);
+            return;
+        }
         currentSocket.emit(
             "swr",
-            +(await asyncRpc(flrigClient, "rig.get_swrmeter"))
+            swr
         );
         currentSocket.emit(
             "pwr",
@@ -571,6 +580,18 @@ io.on("connection", (socket) => {
                 state.frequency / 100
             } kHz.`
         );
+    });
+    // on tune
+    socket.on("tune", async () => {
+        if (!socket.currentUser) {
+            socket.emit("error", "You are not authorized to use this function.");
+            return;
+        }
+        else if (!config.tunable) {
+            socket.emit("error", "This station cannot be tuned.");
+            return;
+        }
+        await asyncRpc(flrigClient, "rig.tune");
     });
     // on logbook request
     socket.on("getLogbook", () => {
