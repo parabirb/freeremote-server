@@ -601,8 +601,11 @@ io.on("connection", (socket) => {
             );
             return;
         }
-        return db.data.users.find((user) => user.id === state.currentUser.id)
-            .logbook;
+        socket.emit(
+            "logbook",
+            db.data.users.find((user) => user.id === state.currentUser.id)
+                .logbook
+        );
     });
     // on new logbook entry
     socket.on("newEntry", async (entry) => {
