@@ -369,13 +369,22 @@ setInterval(async () => {
     if (!currentSocket) return;
     else if (state.transmitting) {
         let swr = +(await asyncRpc(flrigClient, "rig.get_swrmeter"));
-        if (swr >= config.swrCutoff && lastSwr >= config.swrCutoff) {
+        if (
+            swr >= config.swrCutoff &&
+            lastSwr >= config.swrCutoff &&
+            state.mode === "voice"
+        ) {
             state.transmitting = false;
             await asyncRpc(flrigClient, "rig.set_ptt", [0]);
             clearTimeout(currentSocket.pttTimeout);
             currentSocket.emit(
                 "error",
                 "Transmission was aborted due to high SWR."
+            );
+            log(
+                `${state.currentUser.callsign}'s transmission on ${
+                    state.frequency / 100
+                } kHz was aborted due to high SWR. Meter readings were: ${swr}, ${lastSwr}`
             );
             currentSocket.emit("state", state);
             return;
