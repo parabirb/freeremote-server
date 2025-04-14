@@ -356,7 +356,7 @@ rtAudio.openStream(
     "freeremote",
     (pcm) => {
         const encoded = opusEncoder.encodeFloat(pcm, frameSize);
-        if (currentSocket) currentSocket.emit("audio", encoded);
+        if (currentSocket && !state.transmitting) currentSocket.emit("audio", encoded);
     }
 );
 
