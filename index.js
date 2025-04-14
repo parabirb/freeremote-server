@@ -356,7 +356,8 @@ rtAudio.openStream(
     "freeremote",
     (pcm) => {
         const encoded = opusEncoder.encodeFloat(pcm, frameSize);
-        if (currentSocket && !state.transmitting) currentSocket.emit("audio", encoded);
+        if (currentSocket && !state.transmitting)
+            currentSocket.emit("audio", encoded);
     }
 );
 
@@ -521,6 +522,11 @@ io.on("connection", (socket) => {
             socket.emit("error", "PTT is already disengaged.");
             socket.emit("state", state);
             return;
+        } else if (state.mode !== "voice") {
+            socket.emit(
+                "error",
+                "You cannot use the PTT command outside of voice mode."
+            );
         }
         if (socket.pttTimeout) clearTimeout(socket.pttTimeout);
         await asyncRpc(flrigClient, "rig.set_ptt", [0]);
