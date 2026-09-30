@@ -1,9 +1,9 @@
-import type {Band, License} from '../config.js';
+import type { Band, License } from "../config.js";
 
 /**
 Operating modes the station can be in. Only voice is fully supported for now.
 */
-export type Mode = 'voice' | 'ft8' | 'psk31';
+export type Mode = "voice" | "ft8" | "psk31";
 
 /**
 A single QSO in a user's logbook, using ADIF field names.
@@ -41,7 +41,7 @@ export type Database = {
 /**
 The user currently operating the station.
 */
-export type Operator = Pick<User, 'id' | 'callsign' | 'license'>;
+export type Operator = Pick<User, "id" | "callsign" | "license">;
 
 /**
 The contents of a signed station key.

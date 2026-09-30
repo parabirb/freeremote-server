@@ -18,13 +18,15 @@ The server for freeremote, an open source, radio-agnostic program for remote sta
 
 ## Scripts
 
-| Script                              | Description                                                           |
-| ----------------------------------- | --------------------------------------------------------------------- |
-| `npm run dev`                       | Run from source, restarting on changes                                |
-| `npm run build`                     | Compile TypeScript to `dist/`                                         |
-| `npm start`                         | Run the compiled server                                               |
-| `npm run generate-keys`             | Generate the PGP key pair used for station keys                       |
-| `npm run audio-devices`             | List available audio devices                                          |
-| `npm run typecheck`                 | Type-check without emitting                                           |
-| `npm run lint` / `npm run lint:fix` | Lint (and format, via Prettier) with [XO](https://github.com/xojs/xo) |
-| `npm test`                          | Type-check and lint                                                   |
+| Script                  | Description                                                                   |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `npm run dev`           | Run from source, restarting on changes                                        |
+| `npm run build`         | Compile TypeScript to `dist/`                                                 |
+| `npm start`             | Run the compiled server                                                       |
+| `npm run generate-keys` | Generate the PGP key pair used for station keys                               |
+| `npm run audio-devices` | List available audio devices                                                  |
+| `npm run typecheck`     | Type-check without emitting                                                   |
+| `npm run lint`          | Lint with [XO](https://github.com/xojs/xo) and check formatting with Prettier |
+| `npm run lint:fix`      | Apply XO fixes, then format with Prettier                                     |
+| `npm run format`        | Format with Prettier                                                          |
+| `npm test`              | Type-check and lint                                                           |

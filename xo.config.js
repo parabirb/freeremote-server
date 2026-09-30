@@ -3,12 +3,12 @@
 */
 const xoConfig = [
     {
-        // Use Prettier for formatting; XO turns off its conflicting style rules.
-        prettier: true,
+        // XO only lints; formatting is left entirely to Prettier (see .prettierrc).
+        prettier: "compat",
         space: 4,
     },
     {
-        ignores: ['dist/**'],
+        ignores: ["dist/**"],
     },
 ];
 

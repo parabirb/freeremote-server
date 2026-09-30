@@ -9,12 +9,12 @@
 //
 // Only one user may operate the station at a time. Users authenticate with a
 // PGP-signed key issued by the Discord bot's `/requestkey` command.
-import {Buffer} from 'node:buffer';
-import process from 'node:process';
-import audify from 'audify';
-import ngrok from '@ngrok/ngrok';
-import {Server, type Socket} from 'socket.io';
-import {JSONFilePreset} from 'lowdb/node';
+import { Buffer } from "node:buffer";
+import process from "node:process";
+import audify from "audify";
+import ngrok from "@ngrok/ngrok";
+import { Server, type Socket } from "socket.io";
+import { JSONFilePreset } from "lowdb/node";
 import {
     readKey,
     readPrivateKey,
@@ -22,7 +22,7 @@ import {
     createCleartextMessage,
     sign,
     verify,
-} from 'openpgp';
+} from "openpgp";
 import {
     REST,
     Routes,
@@ -31,10 +31,10 @@ import {
     GatewayIntentBits,
     MessageFlags,
     type ChatInputCommandInteraction,
-} from 'discord.js';
-import config, {type License} from '../config.js';
-import {commands} from './commands.js';
-import {canTransmit, findBand} from './privileges.js';
+} from "discord.js";
+import config, { type License } from "../config.js";
+import { commands } from "./commands.js";
+import { canTransmit, findBand } from "./privileges.js";
 import {
     getFrequency,
     rigNumber,
@@ -42,8 +42,8 @@ import {
     setPtt,
     asyncRpc,
     flrigClient,
-} from './rig.js';
-import {logbookEntrySchema, logbookSchema} from './schemas.js';
+} from "./rig.js";
+import { logbookEntrySchema, logbookSchema } from "./schemas.js";
 import type {
     ClientToServerEvents,
     Database,
@@ -53,7 +53,7 @@ import type {
     ServerToClientEvents,
     SocketData,
     StationState,
-} from './types.js';
+} from "./types.js";
 
 type StationSocket = Socket<
     ClientToServerEvents,
@@ -70,20 +70,20 @@ type StationSocket = Socket<
 User whitelist and logbooks, persisted to `database.json`.
 */
 // eslint-disable-next-line new-cap -- lowdb's factory function is PascalCase.
-const db = await JSONFilePreset<Database>('database.json', {users: []});
+const db = await JSONFilePreset<Database>("database.json", { users: [] });
 
 // PGP keys used to sign (Discord bot) and verify (socket auth) station keys.
-const publicKey = await readKey({armoredKey: config.publicKey});
-const privateKey = await readPrivateKey({armoredKey: config.privateKey});
+const publicKey = await readKey({ armoredKey: config.publicKey });
+const privateKey = await readPrivateKey({ armoredKey: config.privateKey });
 
 /**
 Station state; the whole object is sent to the client whenever it changes.
 */
 const state: StationState = {
     transmitting: false,
-    mode: 'voice',
+    mode: "voice",
     frequency: await getFrequency(),
-    maxpwr: await rigNumber('rig.get_maxpwr'),
+    maxpwr: await rigNumber("rig.get_maxpwr"),
 };
 
 /**
@@ -102,7 +102,7 @@ function formatFrequency(frequency: number): string {
 Release PTT and exit.
 */
 async function shutdown(): Promise<void> {
-    console.log('Shutting down...');
+    console.log("Shutting down...");
     currentSocket?.disconnect();
     await setPtt(false);
     // eslint-disable-next-line unicorn/no-process-exit -- this is an intentional, user-requested shutdown.
@@ -142,68 +142,68 @@ async function handleCommand(
     interaction: ChatInputCommandInteraction,
 ): Promise<void> {
     // Defer the reply so Discord doesn't time out on slow operations.
-    await interaction.deferReply({flags: MessageFlags.Ephemeral});
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const reply = async (content: string) => {
-        await interaction.editReply({content});
+        await interaction.editReply({ content });
     };
 
     const isAdmin = config.admins.includes(interaction.user.id);
 
     switch (interaction.commandName) {
-        case 'adduser': {
+        case "adduser": {
             if (!isAdmin) {
-                await reply('You are not authorized to run this command!');
+                await reply("You are not authorized to run this command!");
                 return;
             }
 
-            const toAdd = interaction.options.getUser('user', true).id;
+            const toAdd = interaction.options.getUser("user", true).id;
             if (db.data.users.some((user) => user.id === toAdd)) {
-                await reply('This user is already in the whitelist!');
+                await reply("This user is already in the whitelist!");
                 return;
             }
 
-            await db.update(({users}) => {
+            await db.update(({ users }) => {
                 users.push({
                     id: toAdd,
-                    callsign: interaction.options.getString('callsign', true),
+                    callsign: interaction.options.getString("callsign", true),
                     // The command's choices restrict this to a valid license.
                     license: interaction.options.getString(
-                        'license',
+                        "license",
                         true,
                     ) as License,
                     logbook: [],
                 });
             });
-            await reply('This user has been added to the whitelist.');
+            await reply("This user has been added to the whitelist.");
             break;
         }
 
-        case 'deluser': {
+        case "deluser": {
             if (!isAdmin) {
-                await reply('You are not authorized to run this command!');
+                await reply("You are not authorized to run this command!");
                 return;
             }
 
-            const toDelete = interaction.options.getString('user', true);
+            const toDelete = interaction.options.getString("user", true);
             if (db.data.users.every((user) => user.id !== toDelete)) {
-                await reply('User is not in the database.');
+                await reply("User is not in the database.");
                 return;
             }
 
             await db.update((data) => {
                 data.users = data.users.filter((user) => user.id !== toDelete);
             });
-            await reply('User has been deleted from the whitelist.');
+            await reply("User has been deleted from the whitelist.");
             break;
         }
 
-        case 'requestkey': {
+        case "requestkey": {
             const user = db.data.users.find(
                 (user) => user.id === interaction.user.id,
             );
             if (!user) {
-                await reply('You are not in the whitelist.');
+                await reply("You are not in the whitelist.");
                 return;
             }
 
@@ -220,9 +220,9 @@ async function handleCommand(
             const message = await createCleartextMessage({
                 text: JSON.stringify(payload),
             });
-            const signed = await sign({message, signingKeys: privateKey});
+            const signed = await sign({ message, signingKeys: privateKey });
             await interaction.editReply({
-                content: 'Below is your key.',
+                content: "Below is your key.",
                 files: [
                     new AttachmentBuilder(Buffer.from(signed)).setName(
                         `${user.callsign}-${Date.now()}.txt`,
@@ -232,22 +232,22 @@ async function handleCommand(
             break;
         }
 
-        case 'shutdown': {
+        case "shutdown": {
             if (!isAdmin) {
-                await reply('You are not authorized to run this command!');
+                await reply("You are not authorized to run this command!");
                 return;
             }
 
-            await reply('Shutting down.');
+            await reply("Shutting down.");
             await shutdown();
             break;
         }
 
-        case 'inuse': {
+        case "inuse": {
             await reply(
                 state.currentUser
                     ? `The station is currently being used by <@${state.currentUser.id}> (${state.currentUser.callsign}).`
-                    : 'The station is not in use right now.',
+                    : "The station is not in use right now.",
             );
             break;
         }
@@ -258,7 +258,7 @@ async function handleCommand(
     }
 }
 
-discordClient.on('interactionCreate', (interaction) => {
+discordClient.on("interactionCreate", (interaction) => {
     if (!interaction.isChatInputCommand()) {
         return;
     }
@@ -270,7 +270,7 @@ discordClient.on('interactionCreate', (interaction) => {
 const rest = new REST().setToken(config.discordToken);
 await rest.put(
     Routes.applicationGuildCommands(config.applicationId, config.guildId),
-    {body: commands},
+    { body: commands },
 );
 await discordClient.login(config.discordToken);
 
@@ -300,17 +300,17 @@ Bytes per decoded frame (mono 32-bit float).
 const frameBytes = frameSize * 4;
 
 rtAudio.openStream(
-    {deviceId: config.audioOutput, nChannels: 1},
-    {deviceId: config.audioInput, nChannels: 1},
+    { deviceId: config.audioOutput, nChannels: 1 },
+    { deviceId: config.audioInput, nChannels: 1 },
     audify.RtAudioFormat.RTAUDIO_FLOAT32,
     config.sampleRate,
     frameSize,
-    'freeremote',
+    "freeremote",
     (pcm) => {
         // Stream receive audio to the operator, except while transmitting.
         const encoded = opusEncoder.encodeFloat(pcm, frameSize);
         if (currentSocket && !state.transmitting) {
-            currentSocket.emit('audio', encoded);
+            currentSocket.emit("audio", encoded);
         }
     },
     null,
@@ -338,33 +338,33 @@ async function pollMeters(): Promise<void> {
     }
 
     if (!state.transmitting) {
-        socket.emit('dbm', await rigNumber('rig.get_DBM'));
+        socket.emit("dbm", await rigNumber("rig.get_DBM"));
         return;
     }
 
-    const swr = await rigNumber('rig.get_swrmeter');
+    const swr = await rigNumber("rig.get_swrmeter");
     if (
         lastSwr !== undefined &&
-        state.mode === 'voice' &&
+        state.mode === "voice" &&
         swr >= config.swrCutoff &&
         lastSwr >= config.swrCutoff
     ) {
         state.transmitting = false;
         await setPtt(false);
         clearTimeout(socket.data.pttTimeout);
-        socket.emit('error', 'Transmission was aborted due to high SWR.');
+        socket.emit("error", "Transmission was aborted due to high SWR.");
         log(
             `${state.currentUser?.callsign}'s transmission on ${formatFrequency(
                 state.frequency,
             )} was aborted due to high SWR. Meter readings were: ${swr}, ${lastSwr}`,
         );
-        socket.emit('state', state);
+        socket.emit("state", state);
         return;
     }
 
     lastSwr = swr;
-    socket.emit('swr', swr);
-    socket.emit('pwr', await rigNumber('rig.get_pwrmeter'));
+    socket.emit("swr", swr);
+    socket.emit("pwr", await rigNumber("rig.get_pwrmeter"));
 }
 
 setInterval(() => {
@@ -387,12 +387,15 @@ const io = new Server<
  invalid or has expired.
  */
 async function verifyKey(key: unknown): Promise<KeyPayload | undefined> {
-    if (typeof key !== 'string') {
+    if (typeof key !== "string") {
         return undefined;
     }
 
-    const message = await readCleartextMessage({cleartextMessage: key});
-    const {signatures} = await verify({message, verificationKeys: publicKey});
+    const message = await readCleartextMessage({ cleartextMessage: key });
+    const { signatures } = await verify({
+        message,
+        verificationKeys: publicKey,
+    });
     const [signature] = signatures;
     if (!signature) {
         return undefined;
@@ -403,7 +406,7 @@ async function verifyKey(key: unknown): Promise<KeyPayload | undefined> {
     return JSON.parse(message.getText()) as KeyPayload;
 }
 
-io.on('connection', (socket) => {
+io.on("connection", (socket) => {
     socket.data.authenticated = false;
 
     /**
@@ -411,14 +414,14 @@ io.on('connection', (socket) => {
      authenticated. Handler errors are logged instead of crashing the server.
      */
     function onAuthenticated(
-        event: Exclude<keyof ClientToServerEvents, 'auth' | 'audio'>,
+        event: Exclude<keyof ClientToServerEvents, "auth" | "audio">,
         handler: (payload: unknown) => void | Promise<void>,
     ): void {
         socket.on(event, (payload?: unknown) => {
             if (!socket.data.authenticated) {
                 socket.emit(
-                    'error',
-                    'You are not authorized to use this function.',
+                    "error",
+                    "You are not authorized to use this function.",
                 );
                 return;
             }
@@ -428,13 +431,13 @@ io.on('connection', (socket) => {
     }
 
     // Log in with a station key. Only one user may be logged in at a time.
-    socket.on('auth', (key) => {
+    socket.on("auth", (key) => {
         handleAuth(key).catch(console.error);
     });
 
     async function handleAuth(key: unknown): Promise<void> {
         if (state.currentUser) {
-            socket.emit('error', 'A user is already logged in.');
+            socket.emit("error", "A user is already logged in.");
             return;
         }
 
@@ -446,30 +449,30 @@ io.on('connection', (socket) => {
         }
 
         if (!payload) {
-            socket.emit('error', 'Key could not be verified.');
+            socket.emit("error", "Key could not be verified.");
             return;
         }
 
-        const {id, callsign, license} = payload;
+        const { id, callsign, license } = payload;
         // Reject keys that have expired or belong to users since removed from the whitelist.
         if (
             payload.expiration < Date.now() ||
             db.data.users.every((user) => user.id !== id)
         ) {
-            socket.emit('error', 'Key is expired.');
+            socket.emit("error", "Key is expired.");
             return;
         }
 
-        state.currentUser = {callsign, license, id};
+        state.currentUser = { callsign, license, id };
         currentSocket = socket;
         socket.data.authenticated = true;
-        socket.emit('login', {
+        socket.emit("login", {
             sampleRate: config.sampleRate,
             bands: config.bands,
             clubName: config.clubName,
             clubEmail: config.clubEmail,
         });
-        socket.emit('state', state);
+        socket.emit("state", state);
         log(`${callsign} (<@${id}>) has logged into the remote station.`);
     }
 
@@ -479,17 +482,17 @@ io.on('connection', (socket) => {
     async function releasePtt(): Promise<void> {
         await setPtt(false);
         state.transmitting = false;
-        socket.emit('state', state);
+        socket.emit("state", state);
         log(`${state.currentUser?.callsign}'s PTT timed out.`);
     }
 
     // Engage PTT (voice mode only). PTT is released automatically after
     // `config.pttTimeout` seconds.
-    onAuthenticated('ptt', async () => {
-        if (state.mode !== 'voice') {
+    onAuthenticated("ptt", async () => {
+        if (state.mode !== "voice") {
             socket.emit(
-                'error',
-                'You cannot use the PTT command outside of voice mode.',
+                "error",
+                "You cannot use the PTT command outside of voice mode.",
             );
             return;
         }
@@ -504,8 +507,8 @@ io.on('connection', (socket) => {
             )
         ) {
             socket.emit(
-                'error',
-                'You are attempting to transmit outside of your privileges.',
+                "error",
+                "You are attempting to transmit outside of your privileges.",
             );
             return;
         }
@@ -517,24 +520,24 @@ io.on('connection', (socket) => {
 
         state.transmitting = true;
         await setPtt(true);
-        socket.emit('state', state);
+        socket.emit("state", state);
         log(
             `${state.currentUser.callsign} PTTed on ${formatFrequency(state.frequency)}.`,
         );
     });
 
     // Release PTT (voice mode only).
-    onAuthenticated('unptt', async () => {
+    onAuthenticated("unptt", async () => {
         if (!state.transmitting) {
-            socket.emit('error', 'PTT is already disengaged.');
-            socket.emit('state', state);
+            socket.emit("error", "PTT is already disengaged.");
+            socket.emit("state", state);
             return;
         }
 
-        if (state.mode !== 'voice') {
+        if (state.mode !== "voice") {
             socket.emit(
-                'error',
-                'You cannot use the PTT command outside of voice mode.',
+                "error",
+                "You cannot use the PTT command outside of voice mode.",
             );
             return;
         }
@@ -542,7 +545,7 @@ io.on('connection', (socket) => {
         clearTimeout(socket.data.pttTimeout);
         await setPtt(false);
         state.transmitting = false;
-        socket.emit('state', state);
+        socket.emit("state", state);
         log(
             `${state.currentUser?.callsign} unPTTed on ${formatFrequency(state.frequency)}.`,
         );
@@ -550,11 +553,11 @@ io.on('connection', (socket) => {
 
     // Transmit audio from the client. Silently ignored unless the socket is
     // the operator and is transmitting in voice mode.
-    socket.on('audio', (chunk) => {
+    socket.on("audio", (chunk) => {
         if (
             !socket.data.authenticated ||
             !state.transmitting ||
-            state.mode !== 'voice' ||
+            state.mode !== "voice" ||
             !Buffer.isBuffer(chunk)
         ) {
             return;
@@ -574,92 +577,92 @@ io.on('connection', (socket) => {
     // Change the VFO frequency (given in units of 10 Hz). The frequency must be
     // inside a configured band, and in digital modes must be that mode's
     // calling frequency for some band.
-    onAuthenticated('frequency', async (frequency) => {
+    onAuthenticated("frequency", async (frequency) => {
         if (state.transmitting) {
             socket.emit(
-                'error',
-                'You cannot change the VFO while transmitting.',
+                "error",
+                "You cannot change the VFO while transmitting.",
             );
             return;
         }
 
-        if (typeof frequency !== 'number') {
-            socket.emit('error', 'Frequency must be a number.');
+        if (typeof frequency !== "number") {
+            socket.emit("error", "Frequency must be a number.");
             return;
         }
 
         const bands = Object.values(config.bands);
         if (
             !findBand(config.bands, frequency) ||
-            (state.mode === 'ft8' &&
+            (state.mode === "ft8" &&
                 bands.every((band) => band.ft8 !== frequency)) ||
-            (state.mode === 'psk31' &&
+            (state.mode === "psk31" &&
                 bands.every((band) => band.psk31 !== frequency))
         ) {
-            socket.emit('error', 'The frequency provided is out of band.');
+            socket.emit("error", "The frequency provided is out of band.");
             return;
         }
 
         await setFrequency(frequency);
         // Read the frequency back, since the rig may have adjusted it.
         state.frequency = await getFrequency();
-        socket.emit('state', state);
+        socket.emit("state", state);
     });
 
     // Trigger the station's antenna tuner.
-    onAuthenticated('tune', async () => {
+    onAuthenticated("tune", async () => {
         if (!config.tunable) {
-            socket.emit('error', 'This station cannot be tuned.');
+            socket.emit("error", "This station cannot be tuned.");
             return;
         }
 
-        await asyncRpc(flrigClient, 'rig.tune');
+        await asyncRpc(flrigClient, "rig.tune");
     });
 
     // Send the operator their logbook.
-    onAuthenticated('getLogbook', () => {
+    onAuthenticated("getLogbook", () => {
         if (state.currentUser) {
-            socket.emit('logbook', getLogbook(state.currentUser.id));
+            socket.emit("logbook", getLogbook(state.currentUser.id));
         }
     });
 
     // Add an entry to the top of the operator's logbook.
-    onAuthenticated('newEntry', async (entry) => {
+    onAuthenticated("newEntry", async (entry) => {
         const result = logbookEntrySchema.validate(entry);
         const operator = state.currentUser;
         if (!operator || result.error !== undefined) {
-            socket.emit('error', 'Invalid logbook entry.');
+            socket.emit("error", "Invalid logbook entry.");
             return;
         }
 
-        await db.update(({users}) => {
+        await db.update(({ users }) => {
             users
                 .find((user) => user.id === operator.id)
                 ?.logbook.unshift(result.value);
         });
-        socket.emit('logbook', getLogbook(operator.id));
+        socket.emit("logbook", getLogbook(operator.id));
     });
 
     // Replace the operator's whole logbook (e.g. after an edit or ADIF import).
-    onAuthenticated('updateLogbook', async (logbook) => {
+    onAuthenticated("updateLogbook", async (logbook) => {
         const result = logbookSchema.validate(logbook);
         const operator = state.currentUser;
         if (!operator || result.error !== undefined) {
-            socket.emit('error', 'Invalid logbook.');
+            socket.emit("error", "Invalid logbook.");
             return;
         }
 
-        await db.update(({users}) => {
+        await db.update(({ users }) => {
             const user = users.find((user) => user.id === operator.id);
             if (user) {
                 user.logbook = result.value;
             }
         });
-        socket.emit('logbook', getLogbook(operator.id));
+        socket.emit("logbook", getLogbook(operator.id));
     });
 
     // Free up the station when the operator disconnects, releasing PTT if needed.
-    socket.on('disconnect', () => {
+    socket.on("disconnect", () => {
         handleDisconnect().catch(console.error);
     });
 
@@ -691,9 +694,9 @@ const listener = await ngrok.forward({
     authtoken: config.ngrokToken,
     addr: config.port,
     // eslint-disable-next-line @typescript-eslint/naming-convention -- ngrok option name.
-    response_header_add: ['Access-Control-Allow-Origin: *'],
+    response_header_add: ["Access-Control-Allow-Origin: *"],
 });
 
 state.url = listener.url() ?? undefined;
 
-console.log('freeremote is now up.');
+console.log("freeremote is now up.");

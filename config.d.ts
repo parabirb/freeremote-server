@@ -14,7 +14,7 @@ export type FrequencyRange = [lower: number, upper: number];
 /**
 License classes recognized by the station (US amateur radio licenses).
 */
-export type License = 'extra' | 'general' | 'technician';
+export type License = "extra" | "general" | "technician";
 
 /**
 Definition of a single amateur band.

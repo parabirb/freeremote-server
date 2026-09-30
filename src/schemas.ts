@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention -- logbook fields use ADIF names. */
-import Joi from 'joi';
-import type {LogbookEntry} from './types.js';
+import Joi from "joi";
+import type { LogbookEntry } from "./types.js";
 
 /**
 Validates a single logbook entry sent by the client.
@@ -8,7 +8,7 @@ Validates a single logbook entry sent by the client.
 export const logbookEntrySchema = Joi.object<LogbookEntry>({
     FREQ: Joi.string()
         .custom((value: string, helpers) =>
-            Number.isNaN(Number(value)) ? helpers.error('any.invalid') : value,
+            Number.isNaN(Number(value)) ? helpers.error("any.invalid") : value,
         )
         .required(),
     QSO_DATE: Joi.string()

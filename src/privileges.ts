@@ -1,5 +1,5 @@
-import type {Band, FrequencyRange} from '../config.js';
-import type {Mode, Operator} from './types.js';
+import type { Band, FrequencyRange } from "../config.js";
+import type { Mode, Operator } from "./types.js";
 
 /**
 Whether `frequency` lies within the half-open range `[lower, upper)`.
@@ -45,13 +45,13 @@ export function canTransmit(
         ranges?.some((range) => isInRange(frequency, range)) ?? false;
 
     const isLicensed =
-        operator.license === 'extra' ||
-        (operator.license === 'general' &&
+        operator.license === "extra" ||
+        (operator.license === "general" &&
             inPrivileges(band.privileges.general)) ||
-        (operator.license === 'technician' &&
+        (operator.license === "technician" &&
             inPrivileges(band.privileges.technician));
 
-    const isModeAllowed = mode !== 'voice' || isInRange(frequency, band.voice);
+    const isModeAllowed = mode !== "voice" || isInRange(frequency, band.voice);
 
     return isLicensed && isModeAllowed;
 }

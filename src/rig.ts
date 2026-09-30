@@ -1,11 +1,11 @@
-import xmlrpc from 'xmlrpc';
-import config from '../config.js';
+import xmlrpc from "xmlrpc";
+import config from "../config.js";
 
 /**
 XML-RPC client for flrig, which controls the radio.
 */
 export const flrigClient = xmlrpc.createClient({
-    host: '127.0.0.1',
+    host: "127.0.0.1",
     port: config.flrigPort,
 });
 
@@ -45,14 +45,14 @@ export async function rigNumber(method: string): Promise<number> {
 Engage (`true`) or release (`false`) the rig's PTT.
 */
 export async function setPtt(isEngaged: boolean): Promise<void> {
-    await asyncRpc(flrigClient, 'rig.set_ptt', [isEngaged ? 1 : 0]);
+    await asyncRpc(flrigClient, "rig.set_ptt", [isEngaged ? 1 : 0]);
 }
 
 /**
 Read the rig's VFO frequency, in units of 10 Hz.
 */
 export async function getFrequency(): Promise<number> {
-    return (await rigNumber('rig.get_vfo')) / 10;
+    return (await rigNumber("rig.get_vfo")) / 10;
 }
 
 /**
@@ -62,5 +62,5 @@ export async function setFrequency(frequency: number): Promise<void> {
     // Add 0.1 Hz so the xmlrpc library serializes this as a double rather
     // than an int, which flrig requires.
     const hertz = frequency * 10;
-    await asyncRpc(flrigClient, 'rig.set_vfo', [hertz + 0.1]);
+    await asyncRpc(flrigClient, "rig.set_vfo", [hertz + 0.1]);
 }
